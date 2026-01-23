@@ -109,23 +109,52 @@ def repo_contributors(
 def ingest_repo(
     full_name: str,
     per_page: int = Query(30, ge=1, le=100),
+    max_pages: int = Query(1, ge=1, le=10),
     db: Session = Depends(get_db),
 ):
     try:
         repo = fetch_repo(full_name)
-        commits = fetch_commits(full_name, per_page=per_page)
+        #commits = fetch_commits(full_name, per_page=per_page)
+        all_commits: list[dict] = []
+        for page in range(1, max_pages + 1):
+            batch = fetch_commits(full_name, per_page=per_page, page=page)
+            if not batch:
+                break
+            all_commits.extend(batch)
     except requests.HTTPError as e:
-        # GitHub returns useful status codes; surface them cleanly
-        status = e.response.status_code if e.response else 502
-        detail = e.response.text if e.response else str(e)
-        raise HTTPException(status_code=status, detail=detail)
+        resp = e.response
+        status = resp.status_code if resp else 502
+
+        remaining = resp.headers.get("X-RateLimit-Remaining") if resp else None
+        reset = resp.headers.get("X-RateLimit-Reset") if resp else None
+
+        if resp is not None and status in (403, 429) and remaining == "0":
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "GitHub rate limit exceeded",
+                    "rate_limit_remaining": remaining,
+                    "rate_limit_reset_epoch": reset,
+                    "tip": "Set GITHUB_TOKEN in .env to increase rate limits.",
+                },
+            )
+
+        raise HTTPException(
+            status_code=status,
+            detail={
+                "error": "GitHub API request failed",
+                "status_code": status,
+                "body": resp.text if resp is not None else str(e),
+            },
+        )
+
 
     # Use the same DB transaction for the entire ingest
     conn = db.connection()
     upsert_repo(conn, repo)
     repo_id = repo["id"]
 
-    for item in commits:
+    for item in all_commits:
         insert_commit(conn, repo_id, item)
 
     db.commit()
@@ -133,6 +162,8 @@ def ingest_repo(
     return {
         "repo": repo["full_name"],
         "repo_id": repo_id,
-        "commits_fetched": len(commits),
+        "commits_fetched": len(all_commits),
+        "per_page": per_page,
+        "max_pages": max_pages,
     }
 
