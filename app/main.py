@@ -2,6 +2,12 @@ from fastapi import FastAPI, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import requests
+from sqlalchemy import create_engine
+
+from app.github_client import fetch_repo, fetch_commits
+from app.github_store import upsert_repo, insert_commit
+
 from app.db import get_db
 
 app = FastAPI(title="Universal Data Platform")
@@ -99,4 +105,34 @@ def repo_contributors(
 
     return {"repo": repo["full_name"], "days": days, "limit": limit, "results": list(rows)}
 
+@app.post("/ingest/repo")
+def ingest_repo(
+    full_name: str,
+    per_page: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    try:
+        repo = fetch_repo(full_name)
+        commits = fetch_commits(full_name, per_page=per_page)
+    except requests.HTTPError as e:
+        # GitHub returns useful status codes; surface them cleanly
+        status = e.response.status_code if e.response else 502
+        detail = e.response.text if e.response else str(e)
+        raise HTTPException(status_code=status, detail=detail)
+
+    # Use the same DB transaction for the entire ingest
+    conn = db.connection()
+    upsert_repo(conn, repo)
+    repo_id = repo["id"]
+
+    for item in commits:
+        insert_commit(conn, repo_id, item)
+
+    db.commit()
+
+    return {
+        "repo": repo["full_name"],
+        "repo_id": repo_id,
+        "commits_fetched": len(commits),
+    }
 
