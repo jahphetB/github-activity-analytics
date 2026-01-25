@@ -34,3 +34,45 @@ Create a Postgres test database and set `TEST_DATABASE_URL` in `.env`, then run:
 
 ```powershell
 pytest -q
+
+
+
+
+┌─────────────┐
+│ GitHub API  │
+│ (REST)      │
+└──────┬──────┘
+       │
+       │  Fetch repos & commits
+       ▼
+┌───────────────────────┐
+│ Ingestion Layer       │
+│ FastAPI               │
+│ POST /ingest/repo     │
+└─────────┬─────────────┘
+          │
+          │  Idempotent inserts
+          ▼
+┌───────────────────────┐
+│ PostgreSQL            │
+│ repos                 │
+│ users                 │
+│ commits               │
+└─────────┬─────────────┘
+          │
+          │  SQL analytics queries
+          ▼
+┌───────────────────────┐
+│ Analytics API         │
+│ GET /repos/top        │
+│ GET /repos/{repo}/    │
+│   activity            │
+│ GET /contributors     │
+└─────────┬─────────────┘
+          │
+          ▼
+┌───────────────────────┐
+│ Clients               │
+│ Swagger / curl / apps │
+└───────────────────────┘
+
