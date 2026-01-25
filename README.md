@@ -9,6 +9,11 @@ A backend service that ingests public GitHub repository data into PostgreSQL and
   - `GET /repos/top?days=30&limit=10`
   - `GET /repos/{full_name}/activity?days=30`
   - `GET /repos/{full_name}/contributors?days=30&limit=10`
+## Metric Definitions
+
+- **Commit activity**: number of commits grouped by UTC day (`DATE_TRUNC('day', committed_at)`).
+- **Top repos**: repositories ranked by total commit count within the last `N` days.
+- **Top contributors**: contributors ranked by commit count within the last `N` days (based on `users.login` when available, otherwise commit author name).
 
 ## Tech Stack
 - Python, FastAPI

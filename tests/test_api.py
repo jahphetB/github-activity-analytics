@@ -150,3 +150,17 @@ def test_repo_activity_daily_counts(client, engine):
     series = body["series"]
     assert {"day": "2026-01-20", "commit_count": 2} in series
     assert {"day": "2026-01-21", "commit_count": 1} in series
+
+def test_repo_contributors(client, engine):
+    seed_basic_data(engine)
+
+    r = client.get("/repos/fastapi/fastapi/contributors?days=365&limit=10")
+    assert r.status_code == 200
+    body = r.json()
+
+    results = body["results"]
+
+    # alice has 2 commits, bob has 1 commit (based on seed_basic_data)
+    assert {"contributor": "alice", "commit_count": 2} in results
+    assert {"contributor": "bob", "commit_count": 1} in results
+
