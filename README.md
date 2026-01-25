@@ -22,3 +22,10 @@ A backend service that ingests public GitHub repository data into PostgreSQL and
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+
+## Testing
+
+Create a Postgres test database and set `TEST_DATABASE_URL` in `.env`, then run:
+
+```powershell
+pytest -q
