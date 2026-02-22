@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS repos (
   updated_at TIMESTAMPTZ,
   pushed_at TIMESTAMPTZ,
 
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+
   last_ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

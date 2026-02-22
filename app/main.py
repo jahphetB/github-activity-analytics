@@ -1,24 +1,34 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
 import requests
-from sqlalchemy import create_engine
-
-from app.github_client import fetch_repo, fetch_commits
-from app.github_store import upsert_repo, insert_commit
 
 from app.db import get_db
+from app.github_client import fetch_repo, fetch_commits
+from app.github_store import upsert_repo, insert_commit
+from app.routes.dashboard import router as dashboard_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Universal Data Platform")
+
+# Register dashboard endpoints under /api/*
+app.include_router(dashboard_router)
+
+# CORS: allow the frontend (Next.js) to call the API from a different origin (localhost:3000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
     value = db.execute(text("SELECT 1")).scalar_one()
     return {"status": "ok", "db": value}
-
-from fastapi import Query, HTTPException
-from sqlalchemy import text
 
 @app.get("/repos/top")
 def top_repos(
