@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import requests
+import os
 
 from app.db import get_db
 from app.github_client import fetch_repo, fetch_commits
@@ -11,19 +12,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Universal Data Platform")
 
-# Register dashboard endpoints under /api/*
-app.include_router(dashboard_router)
-
 # CORS: allow the frontend (Next.js) to call the API from a different origin (localhost:3000)
+cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000")
+allow_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register dashboard endpoints under /api/*
+app.include_router(dashboard_router)
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
