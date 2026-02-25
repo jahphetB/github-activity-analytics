@@ -32,6 +32,7 @@ def health_check(db: Session = Depends(get_db)):
     value = db.execute(text("SELECT 1")).scalar_one()
     return {"status": "ok", "db": value}
 
+
 @app.get("/repos/top")
 def top_repos(
     days: int = Query(30, ge=1, le=365),
@@ -117,6 +118,7 @@ def repo_contributors(
 
     return {"repo": repo["full_name"], "days": days, "limit": limit, "results": list(rows)}
 
+
 @app.post("/ingest/repo")
 def ingest_repo(
     full_name: str,
@@ -126,13 +128,14 @@ def ingest_repo(
 ):
     try:
         repo = fetch_repo(full_name)
-        #commits = fetch_commits(full_name, per_page=per_page)
+
         all_commits: list[dict] = []
         for page in range(1, max_pages + 1):
             batch = fetch_commits(full_name, per_page=per_page, page=page)
             if not batch:
                 break
             all_commits.extend(batch)
+
     except requests.HTTPError as e:
         resp = e.response
         status = resp.status_code if resp else 502
@@ -160,7 +163,6 @@ def ingest_repo(
             },
         )
 
-
     # Use the same DB transaction for the entire ingest
     conn = db.connection()
     upsert_repo(conn, repo)
@@ -179,3 +181,48 @@ def ingest_repo(
         "max_pages": max_pages,
     }
 
+
+# --- Repo management actions for the dashboard UI (NEW) ---
+
+@app.patch("/repos/{full_name:path}/pin")
+def set_pin(full_name: str, value: bool = Query(True), db: Session = Depends(get_db)):
+    row = db.execute(
+        text("UPDATE repos SET is_pinned = :v WHERE full_name = :f RETURNING full_name, is_pinned;"),
+        {"v": value, "f": full_name},
+    ).mappings().first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Repo not found")
+
+    db.commit()
+    return dict(row)
+
+
+@app.patch("/repos/{full_name:path}/active")
+def set_active(full_name: str, value: bool = Query(True), db: Session = Depends(get_db)):
+    row = db.execute(
+        text("UPDATE repos SET is_active = :v WHERE full_name = :f RETURNING full_name, is_active;"),
+        {"v": value, "f": full_name},
+    ).mappings().first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Repo not found")
+
+    db.commit()
+    return dict(row)
+
+
+@app.delete("/repos/{full_name:path}")
+def delete_repo(full_name: str, db: Session = Depends(get_db)):
+    repo = db.execute(
+        text("SELECT id FROM repos WHERE full_name = :f"),
+        {"f": full_name},
+    ).mappings().first()
+
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repo not found")
+
+    # commits.repo_id has ON DELETE CASCADE in schema, so deleting repo deletes commits too.
+    db.execute(text("DELETE FROM repos WHERE id = :id"), {"id": repo["id"]})
+    db.commit()
+    return {"deleted": full_name}

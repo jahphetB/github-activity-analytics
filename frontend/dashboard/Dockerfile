@@ -28,4 +28,4 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["npx","next","start","-H","0.0.0.0","-p","3000"]
