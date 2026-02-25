@@ -1,78 +1,53 @@
-# GitHub Activity Analytics (FastAPI + PostgreSQL)
+A full-stack GitHub activity analytics dashboard built with FastAPI, Next.js, PostgreSQL, Docker, and Azure Container Apps. It ingests live GitHub repository data, stores commit history, and provides interactive analytics including time-series charts, repo management (pin/pause/delete), and search.
 
-A backend service that ingests public GitHub repository data into PostgreSQL and exposes analytics endpoints for repo activity and contributors.
+Live Demo
+Frontend: https://udp-frontend.kindmoss-b31d02e6.centralus.azurecontainerapps.io/dashboard
 
-## Features
-- Ingest any GitHub repo via API: `POST /ingest/repo`
-- Stores structured data in Postgres (`repos`, `users`, `commits`)
-- Analytics endpoints:
-  - `GET /repos/top?days=30&limit=10`
-  - `GET /repos/{full_name}/activity?days=30`
-  - `GET /repos/{full_name}/contributors?days=30&limit=10`
-## Metric Definitions
+What It Does
+•	Ingests GitHub repository data via GitHub REST API
+•	Stores repos, users, and commits in PostgreSQL
+•	Computes commit metrics (total, 7d, 30d)
+•	Generates time-series commit analytics
+•	Interactive repo management (Pin, Pause, Delete)
+•	Search and filter tracked repositories
+•	Adjustable ingestion controls (per_page, max_pages)
 
-- **Commit activity**: number of commits grouped by UTC day (`DATE_TRUNC('day', committed_at)`).
-- **Top repos**: repositories ranked by total commit count within the last `N` days.
-- **Top contributors**: contributors ranked by commit count within the last `N` days (based on `users.login` when available, otherwise commit author name).
+Architecture
+Frontend
+•	Next.js 16 (App Router)
+•	Recharts for visualization
+•	Tailwind CSS for styling
+Backend
+•	FastAPI
+•	SQLAlchemy (Core)
+•	PostgreSQL (Azure Flexible Server)
+•	GitHub API integration
+•	RESTful API design
+Infrastructure
+•	Docker (multi-stage builds)
+•	Azure Container Apps
+•	Azure Container Registry
 
-## Tech Stack
-- Python, FastAPI
-- PostgreSQL
-- SQLAlchemy (Core)
-- GitHub REST API
+Core API Endpoints
+Ingestion:
+POST /ingest/repo?full_name=owner/repo&per_page=30&max_pages=1
+Analytics:
+GET /api/summary
+GET /api/timeseries?days=30
+GET /api/repos?search=...
+Repo Management:
+PATCH /api/repos/{full_name}/pin?is_pinned=true|false
+PATCH /api/repos/{full_name}/active?is_active=true|false
+DELETE /api/repos/{full_name}
 
-## Setup (Windows)
-1) Create and activate venv
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+This project demonstrates full-stack system design, API architecture, database modeling and indexing, external API ingestion, production cloud deployment, and DevOps workflow using Docker and Azure.
 
-## Testing
+Future Improvements
+•	GitHub OAuth authentication
+•	Background job queue for large ingestions
+•	Rate-limit aware batching
+•	Redis caching layer
+•	CI/CD pipeline
+•	Custom domain with HTTPS certificate
 
-Create a Postgres test database and set `TEST_DATABASE_URL` in `.env`, then run:
-
-```powershell
-pytest -q
-
-
-
-
-┌─────────────┐
-│ GitHub API  │
-│ (REST)      │
-└──────┬──────┘
-       │
-       │  Fetch repos & commits
-       ▼
-┌───────────────────────┐
-│ Ingestion Layer       │
-│ FastAPI               │
-│ POST /ingest/repo     │
-└─────────┬─────────────┘
-          │
-          │  Idempotent inserts
-          ▼
-┌───────────────────────┐
-│ PostgreSQL            │
-│ repos                 │
-│ users                 │
-│ commits               │
-└─────────┬─────────────┘
-          │
-          │  SQL analytics queries
-          ▼
-┌───────────────────────┐
-│ Analytics API         │
-│ GET /repos/top        │
-│ GET /repos/{repo}/    │
-│   activity            │
-│ GET /contributors     │
-└─────────┬─────────────┘
-          │
-          ▼
-┌───────────────────────┐
-│ Clients               │
-│ Swagger / curl / apps │
-└───────────────────────┘
 
